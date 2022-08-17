@@ -112,7 +112,12 @@ def login():
 @app.route('/logout')
 def logout():
     """Handle logout of user."""
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
 
+    do_logout()
+    return redirect('/')
     # IMPLEMENT THIS
 
 

@@ -1,11 +1,14 @@
 import os
+from sqlite3 import Timestamp
 
 from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
-from forms import UserAddForm, LoginForm, MessageForm
-from models import db, connect_db, User, Message
+
+
+from forms import UserAddForm, LoginForm, MessageForm, EditAddForm
+from models import db, connect_db, User, Message, Follows
 
 CURR_USER_KEY = "curr_user"
 
@@ -115,9 +118,10 @@ def logout():
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
-
-    do_logout()
-    return redirect('/')
+    if g.user:
+        do_logout()
+        flash(f"Goodbye, and DONT come BACK... JK!", "danger")
+        return redirect('/')
     # IMPLEMENT THIS
 
 
@@ -215,9 +219,37 @@ def stop_following(follow_id):
 @app.route('/users/profile', methods=["GET", "POST"])
 def profile():
     """Update profile for current user."""
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+    
+    form = EditAddForm()
+    user_id =g.user.id
+    user = g.user
 
-    # IMPLEMENT THIS
+    if form.validate_on_submit():
+        user.username = form.username.data
+        user.email = form.email.data
+        user.image_url = form.image_url.data
+        user.header_image_url =form.header_image_url.data
+        user.bio = form.bio.data
+        user.location = form.location.data
+       
+        db.session.add(user)
+        db.session.commit()
+        return redirect(f'/users/{user_id}')
+    
 
+    form.username.data = user.username
+    form.email.data = user.email
+    form.image_url.data = user.image_url
+    form.header_image_url.data = user.header_image_url
+    form.bio.data = user.bio
+    form.location.data = user.location
+    
+    
+
+    return render_template("users/edit.html",form=form,user_id=user_id,user=user)
 
 @app.route('/users/delete', methods=["POST"])
 def delete_user():
@@ -295,15 +327,26 @@ def homepage():
     - anon users: no messages
     - logged in: 100 most recent messages of followed_users
     """
-
+    user = g.user
     if g.user:
-        messages = (Message
-                    .query
-                    .order_by(Message.timestamp.desc())
-                    .limit(100)
-                    .all())
+        # messages = (Message
+        #             .query
+        #             .filter(Message.id == User.following.id)
+        #             .order_by(Message.timestamp.desc())
+        #             .limit(100)
+        #             .all())       
+        messages_my = db.session.query(Message).join(Follows, Message.user_id == Follows.user_being_followed_id ).join(User, User.id == Follows.user_following_id).filter( Follows.user_following_id == user.id ).order_by(Message.timestamp.desc()).limit(100).all()
+    
 
-        return render_template('home.html', messages=messages)
+        # SELECT users.id, users.username, follows.user_being_followed_id, messages.text, messages.id AS message_id   
+        # FROM messages 
+        # JOIN follows  
+        # ON messages.user_id = follows.user_being_followed_id  
+        # JOIN users  
+        # ON users.id = follows.user_following_id
+        # WHERE user_following_id = 1{current user}
+        # ORDER BY user_being_followed_id;        
+        return render_template('home.html', messages=messages_my)
 
     else:
         return render_template('home-anon.html')

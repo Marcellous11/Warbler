@@ -1,9 +1,10 @@
 """SQLAlchemy models for Warbler."""
 
 from datetime import datetime
-
+# import bcrypt
 from flask_sqlalchemy import SQLAlchemy
 # from flask_bcrypt import Bcrypt
+
 
 # bcrypt = Bcrypt()
 db = SQLAlchemy()

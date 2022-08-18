@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 
 from forms import UserAddForm, LoginForm, MessageForm, EditAddForm
-from models import db, connect_db, User, Message, Follows
+from models import db, connect_db, User, Message, Follows,Likes
 
 CURR_USER_KEY = "curr_user"
 
@@ -23,6 +23,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = True
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', "it's a secret")
+app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
@@ -315,6 +316,24 @@ def messages_destroy(message_id):
 
     return redirect(f"/users/{g.user.id}")
 
+@app.route('/users/add_like/<int:msg_id>', methods = ['POST'])
+def liked_meg(msg_id):
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    user = g.user
+    
+    if len(Likes.query.filter(Likes.user_id==user.id,Likes.message_id==msg_id).all()) > 0 :
+        Likes.query.filter(Likes.user_id==user.id,Likes.message_id==msg_id).delete()
+        db.session.commit()
+        return redirect('/')
+    else:
+        like =Likes(user_id=user.id,message_id=msg_id)
+        db.session.add(like)
+        db.session.commit()
+        return redirect('/')
 
 ##############################################################################
 # Homepage and error pages
@@ -328,16 +347,7 @@ def homepage():
     - logged in: 100 most recent messages of followed_users
     """
     user = g.user
-    if g.user:
-        # messages = (Message
-        #             .query
-        #             .filter(Message.id == User.following.id)
-        #             .order_by(Message.timestamp.desc())
-        #             .limit(100)
-        #             .all())       
-        messages_my = db.session.query(Message).join(Follows, Message.user_id == Follows.user_being_followed_id ).join(User, User.id == Follows.user_following_id).filter( Follows.user_following_id == user.id ).order_by(Message.timestamp.desc()).limit(100).all()
-    
-
+    if g.user:           
         # SELECT users.id, users.username, follows.user_being_followed_id, messages.text, messages.id AS message_id   
         # FROM messages 
         # JOIN follows  
@@ -345,8 +355,20 @@ def homepage():
         # JOIN users  
         # ON users.id = follows.user_following_id
         # WHERE user_following_id = 1{current user}
-        # ORDER BY user_being_followed_id;        
-        return render_template('home.html', messages=messages_my)
+        # ORDER BY user_being_followed_id;  
+     
+        messages_my = db.session.query(Message).join(Follows, Message.user_id == Follows.user_being_followed_id ).join(User, User.id == Follows.user_following_id).filter( Follows.user_following_id == user.id ).order_by(Message.timestamp.desc()).limit(100).all()        
+
+        # SELECT messages.id , messages.user_id, messages.text, users.username AS person_who_liked_post 
+        # FROM messages 
+        # JOIN likes 
+        # ON messages.id = likes.message_id 
+        # JOIN users  
+        # ON users.id = likes.user_id; 
+
+        all_likes = db.session.query(Message).join(Likes, Message.id == Likes.message_id).join(User, User.id == Likes.user_id).all()        
+             
+        return render_template('home.html', messages=messages_my,user=user,likes=all_likes)
 
     else:
         return render_template('home-anon.html')

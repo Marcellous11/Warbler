@@ -2,7 +2,7 @@ import os
 from sqlite3 import Timestamp
 
 from flask import Flask, render_template, request, flash, redirect, session, g
-from flask_debugtoolbar import DebugToolbarExtension
+# from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
 
@@ -23,8 +23,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = True
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', "it's a secret")
-app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
-toolbar = DebugToolbarExtension(app)
+# app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
+# toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
 
@@ -160,7 +160,10 @@ def users_show(user_id):
                 .order_by(Message.timestamp.desc())
                 .limit(100)
                 .all())
-    return render_template('users/show.html', user=user, messages=messages)
+
+    all_likes = db.session.query(Message).join(Likes, Message.id == Likes.message_id).join(User, User.id == Likes.user_id).all() 
+    leny = len(all_likes)  
+    return render_template('users/show.html', user=user, messages=messages,leny=leny)
 
 
 @app.route('/users/<int:user_id>/following')
